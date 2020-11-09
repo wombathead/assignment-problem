@@ -1,6 +1,6 @@
 from collections import Counter
 from fractions import Fraction
-from itertools import permutations 
+from itertools import permutations, product
 
 def object_available(remaining):
     return any(remaining.values())
@@ -45,31 +45,33 @@ def PS(preferences):
         # the number of agents consuming this object
         agents_consuming = c[0][1]
 
-        # each player consumes delta more of the object they are consuming in
-        # this time step
+        # give each player delta more of their currently consumed object
         delta = Fraction(remaining[most_consumed], agents_consuming)
 
-        # give delta more share to each agent of their currently consumed
-        # object
         for i in players:
             consumed[i][consuming[i]] += delta
             remaining[consuming[i]] -= delta
 
-        # player i consumes their next most preferred object that is available
+        # player i starts consuming their next most preferred
+        # available object, if necessary
         for i in players:
             if remaining[consuming[i]] == 0:
                 idx = 0
                 while remaining[preferences[i][idx]] == 0:
                     idx += 1
 
+                    # there are no objects left
                     if idx > n-1:
                         return consumed
 
                 consuming[i] = preferences[i][idx]
 
-def sd(p, q, preferences):
-    """ return TRUE if allocation Pi stochastically dominates allocation Qi
-    according to PREFERENCES for player i """
+def sd(P, Q, player, preferences):
+    """ return TRUE if allocation P stochastically dominates allocation Q
+    according to PREFERENCES for PLAYER """
+    
+    p = P[player]
+    q = Q[player]
 
     for t in range(len(preferences)):
         t += 1
@@ -83,10 +85,15 @@ def sd(p, q, preferences):
 
     return True
 
-def prefers(p, q, preferences):
-    """ return TRUE if player i gets her best best object with greater
-    probability in P than Q, OR if she gets her best with equal probability and
-    her next best with greater probability in P than Q, OR ... """
+def prefers(P, Q, player, preferences):
+    """ suppose P allocates PLAYER the objects, in order of most to least
+    preferred), with probabilities (x,y,z,...) while Q allocates
+    (x',y',z',...). Then PLAYER prefers P to Q if: (x > x') OR (x = x' AND y >
+    y') OR ... according to the preference ordering for PLAYER (the list of
+    length n PREFERENCES) """
+
+    p = P[player]
+    q = Q[player]
 
     for t in range(len(preferences)):
         t += 1
@@ -100,6 +107,39 @@ def prefers(p, q, preferences):
         elif q_sum > p_sum:
             return False
 
+    # NOTE: if the allocations are equal, return False
+    return False
+
+def best(preferences, player, true):
+    """ find an allocation that is the best case outcome from submitting the
+    strategy in PREFERENCES[PLAYER], compared by the preference ordering TRUE
+    of PLAYER (which may be different from the preference order they submit)
+    """
+
+    pi = preferences[player]
+    p_i = preferences[:player] + preferences[player+1:]
+
+    best = None
+
+    # compute a permutation on each player's preferences other than PLAYER and
+    # calculate the allocation
+
+    # TODO: generalise to n-1 players
+    combos = list(product(permutations(p_i[0]), permutations(p_i[1])))
+
+    # for each profile p of player i
+    for profile_i in combos:
+        profile = list(profile_i[:player] + profile_i[player+1:])
+        profile.insert(player, tuple(pi))
+        outcome = PS(profile)
+
+        if best is None:
+            best = outcome
+        elif prefers(outcome, best, player, true):
+            best = outcome
+    
+    return best
+
 def main():
 
     preferences = [
@@ -107,22 +147,32 @@ def main():
         [0,2,1],
         [1,0,2]]
 
+    # true preferences for player 3
+    tp_3 = preferences[2]
+
     p = PS(preferences)
     q = PS(preferences[:2] + [list([0,1,2])])
 
-    print_assignment(p)
-    print()
-    print_assignment(q)
+    #print(sd(p, q, 2, preferences[2]))
+    #print(prefers(p, q, 2, preferences[2]))
+
+    truthful = PS(preferences)
+    print_assignment(truthful)
     print()
 
-    print(sd(p[2], q[2], preferences[2]))
-    print(prefers(p[2], q[2], preferences[2]))
-
+    # test if player 3 has an incentive to deviate according to prefers(.)
     #for perm in permutations(preferences[2]):
     #    profile = preferences[:2] + [list(perm)]
-    #    print(profile)
-    #    print_assignment(PS(profile))
-    #    print()
+    #    deviation = PS(profile)
+    #    print("Preferences:", profile)
+    #    print_assignment(deviation)
+    #    print("Player 3 prefers {} to {}\n".format(
+    #        "truthful" if prefers(truthful, deviation, 2, preferences[2]) else "deviation",
+    #        "deviation" if prefers(truthful, deviation, 2, preferences[2]) else "truthful"))
+
+    truthful_best = best(preferences, 2, tp_3)
+    
+    print_assignment(truthful_best)
 
 if __name__=="__main__":
     main()
