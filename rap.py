@@ -110,19 +110,17 @@ def prefers(P, Q, player, preferences):
     # NOTE: if the allocations are equal, return False
     return False
 
-def best(preferences, player, true):
-    """ find an allocation that is the best case outcome from submitting the
-    strategy in PREFERENCES[PLAYER], compared by the preference ordering TRUE
-    of PLAYER (which may be different from the preference order they submit)
+def best(player, preferences, true):
+    """ find an allocation with the best case outcome when PLAYER submits the
+    list PREFERENCES of length n, where outcomes are compared according to TRUE
     """
 
-    pi = preferences[player]
-    p_i = preferences[:player] + preferences[player+1:]
+    n = len(preferences)
 
     best = None
-
-    # compute a permutation on each player's preferences other than PLAYER and
-    # calculate the allocation
+    p_i = []
+    for i in range(n-1):
+        p_i += [[i for i in range(n)]]
 
     # TODO: generalise to n-1 players
     combos = list(product(permutations(p_i[0]), permutations(p_i[1])))
@@ -130,7 +128,7 @@ def best(preferences, player, true):
     # for each profile p of player i
     for profile_i in combos:
         profile = list(profile_i[:player] + profile_i[player+1:])
-        profile.insert(player, tuple(pi))
+        profile.insert(player, tuple(preferences))
         outcome = PS(profile)
 
         if best is None:
@@ -140,6 +138,75 @@ def best(preferences, player, true):
     
     return best
 
+def best_truthful(player, true):
+    return best(player, true, true)
+
+def best_deviation(player, true):
+    """ Compute the deviation from PLAYER's true preference ordering TRUE that
+    yields the best outcome, compared by TRUE """
+
+    best_outcome = None
+    best_deviation = None
+
+    for deviation in list(permutations(true))[1:]:
+        curr = best(player, deviation, true)
+
+        if best_outcome is None:
+            best_outcome = curr
+            best_deviation = deviation
+        elif prefers(curr, best_outcome, player, true):
+            best_outcome = curr
+
+    print("Best outcome achieved by", best_deviation)
+    return best_outcome
+
+def worst(player, preferences, true):
+    """ find an allocation with the worst case outcome when PLAYER submits the
+    list PREFERENCES of length n, where outcomes are compared according to TRUE
+    """
+
+    n = len(preferences)
+
+    worst = None
+
+    p_i = []
+    for i in range(n-1):
+        p_i += [[i for i in range(n)]]
+
+    combos = list(product(permutations(p_i[0]), permutations(p_i[1])))
+
+    # for each profile p of player i
+    for profile_i in combos:
+        profile = list(profile_i[:player] + profile_i[player+1:])
+        profile.insert(player, tuple(preferences))
+        outcome = PS(profile)
+
+        if worst is None:
+            worst = outcome
+        elif prefers(worst, outcome, player, true):
+            worst = outcome
+    
+    return worst
+
+def worst_truthful(player, true):
+    return worst(player, true, true)
+
+def worst_deviation(player, true):
+    worst_outcome = None
+    worst_deviation = None
+
+    for deviation in list(permutations(true))[1:]:
+        curr = worst(player, deviation, true)
+
+        if worst_outcome is None:
+            worst_outcome = curr
+            worst_deviation = deviation
+        elif prefers(curr, worst_outcome, player, true):
+            worst_outcome = curr
+
+    print("Worst outcome achieved by", worst_deviation)
+    return worst_outcome
+
 def main():
 
     preferences = [
@@ -148,7 +215,7 @@ def main():
         [1,0,2]]
 
     # true preferences for player 3
-    tp_3 = preferences[2]
+    true_3 = preferences[2]
 
     p = PS(preferences)
     q = PS(preferences[:2] + [list([0,1,2])])
@@ -157,8 +224,6 @@ def main():
     #print(prefers(p, q, 2, preferences[2]))
 
     truthful = PS(preferences)
-    print_assignment(truthful)
-    print()
 
     # test if player 3 has an incentive to deviate according to prefers(.)
     #for perm in permutations(preferences[2]):
@@ -170,9 +235,20 @@ def main():
     #        "truthful" if prefers(truthful, deviation, 2, preferences[2]) else "deviation",
     #        "deviation" if prefers(truthful, deviation, 2, preferences[2]) else "truthful"))
 
-    truthful_best = best(preferences, 2, tp_3)
-    
-    print_assignment(truthful_best)
+    # truthful_best = best(preferences, 2, true_3)
+    #print_assignment(truthful_best)
+
+    print("Best truthful outcome:")
+    print_assignment(best_truthful(2, true_3))
+
+    print("\nBest outcome from deviating")
+    print_assignment(best_deviation(2, true_3))
+
+    print("\nWorst truthful outcome")
+    print_assignment(worst_truthful(2, true_3))
+
+    print("\nWorst outcome from deviating")
+    print_assignment(worst_deviation(2, true_3))
 
 if __name__=="__main__":
     main()
