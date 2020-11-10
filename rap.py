@@ -95,7 +95,9 @@ def prefers(P, Q, player, preferences):
     p = P[player]
     q = Q[player]
 
-    for t in range(len(preferences)):
+    n = len(preferences)
+
+    for t in range(n):
         t += 1
         best_items = preferences[:t]
 
@@ -107,8 +109,19 @@ def prefers(P, Q, player, preferences):
         elif q_sum > p_sum:
             return False
 
+        # NOTE: adding this means prefers(·) is total order i.e. all profiles
+        # are able to be compared
+        if t == n:
+            return True
+
     # NOTE: if the allocations are equal, return False
     return False
+
+def alternate_profiles(p_i):
+    """ return a list of all >-i, alternate preferences that do not include
+    player i's preferences """
+    # TODO: generalise to n-1 players
+    return list(product(permutations(p_i[0]), permutations(p_i[1])))
 
 def best(player, preferences, true):
     """ find an allocation with the best case outcome when PLAYER submits the
@@ -122,11 +135,8 @@ def best(player, preferences, true):
     for i in range(n-1):
         p_i += [[i for i in range(n)]]
 
-    # TODO: generalise to n-1 players
-    combos = list(product(permutations(p_i[0]), permutations(p_i[1])))
-
     # for each profile p of player i
-    for profile_i in combos:
+    for profile_i in alternate_profiles(p_i):
         profile = list(profile_i[:player] + profile_i[player+1:])
         profile.insert(player, tuple(preferences))
         outcome = PS(profile)
@@ -168,43 +178,48 @@ def worst(player, preferences, true):
     n = len(preferences)
 
     worst = None
+    worst_profile = None
 
     p_i = []
     for i in range(n-1):
         p_i += [[i for i in range(n)]]
 
-    combos = list(product(permutations(p_i[0]), permutations(p_i[1])))
-
     # for each profile p of player i
-    for profile_i in combos:
+    for profile_i in alternate_profiles(p_i):
         profile = list(profile_i[:player] + profile_i[player+1:])
         profile.insert(player, tuple(preferences))
         outcome = PS(profile)
 
         if worst is None:
             worst = outcome
+            worst_profile = profile
         elif prefers(worst, outcome, player, true):
             worst = outcome
+            worst_profile = profile
     
+    print("Profile:", worst_profile)
     return worst
 
 def worst_truthful(player, true):
     return worst(player, true, true)
 
 def worst_deviation(player, true):
+    """ find the outcome resulting from a deviation from PLAYER that is
+    preferred by any other deviation according to TRUE """
     worst_outcome = None
     worst_deviation = None
 
     for deviation in list(permutations(true))[1:]:
-        curr = worst(player, deviation, true)
+        outcome = worst(player, deviation, true)
 
         if worst_outcome is None:
-            worst_outcome = curr
+            worst_outcome = outcome
             worst_deviation = deviation
-        elif prefers(curr, worst_outcome, player, true):
-            worst_outcome = curr
+        elif prefers(outcome, worst_outcome, player, true):
+            worst_outcome = outcome
+            worst_deviation = deviation
 
-    print("Worst outcome achieved by", worst_deviation)
+    print("Worst occurred at", worst_deviation)
     return worst_outcome
 
 def main():
@@ -236,7 +251,7 @@ def main():
     #        "deviation" if prefers(truthful, deviation, 2, preferences[2]) else "truthful"))
 
     # truthful_best = best(preferences, 2, true_3)
-    #print_assignment(truthful_best)
+    # print_assignment(truthful_best)
 
     print("Best truthful outcome:")
     print_assignment(best_truthful(2, true_3))
